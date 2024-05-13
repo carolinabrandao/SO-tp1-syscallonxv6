@@ -6,6 +6,9 @@
 #include "proc.h"
 #include "defs.h"
 
+#define NUM_SYSCALLS 23  // number of system calls
+int syscall_counts[NUM_SYSCALLS] = {0};   // Initialize all elements to 0
+
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -17,6 +20,8 @@ struct spinlock pid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
+
+
 
 extern char trampoline[]; // trampoline.S
 

@@ -1,4 +1,5 @@
 struct stat;
+#include "../kernel/types.h"
 
 // system calls
 int fork(void);
@@ -39,3 +40,4 @@ void free(void*);
 int atoi(const char*);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
+int getcnt(int syscall_num);
