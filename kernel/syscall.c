@@ -55,11 +55,10 @@ argraw(int n)
 }
 
 // Fetch the nth 32-bit system call argument.
-int
+void
 argint(int n, int *ip)
 {
   *ip = argraw(n);
-  return 0;
 }
 // Retrieve an argument as a pointer.
 // Doesn't check for legality, since
@@ -132,7 +131,6 @@ static uint64 (*syscalls[])(void) = {
 [SYS_getcnt]  sys_getcnt,
 };
 
-
 void
 syscall(void)
 {
@@ -143,7 +141,8 @@ syscall(void)
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
-    syscall_counts[num]++;
+    
+    syscall_counts[num]++; // Increment the count of the number of times this syscall has been called
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n",

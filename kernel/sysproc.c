@@ -6,7 +6,6 @@
 #include "spinlock.h"
 #include "proc.h"
 
-
 extern int syscall_counts[NUM_SYSCALLS]; 
 
 uint64
@@ -98,7 +97,9 @@ uint64
 sys_getcnt(void)
 {
   int syscall_number;
-  if (argint(0, &syscall_number) < 0)
+  argint(0, &syscall_number);
+  if (syscall_number < 1 || syscall_number >= NUM_SYSCALLS){
     return -1;
+  }
   return syscall_counts[syscall_number];
 }
