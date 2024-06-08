@@ -167,6 +167,11 @@ clockintr()
   ticks++;
   wakeup(&ticks);
   release(&tickslock);
+
+  struct proc *p = myproc();
+    if (p != 0) {
+        p->ticks++;
+    }
 }
 
 // check if it's an external interrupt or software interrupt,

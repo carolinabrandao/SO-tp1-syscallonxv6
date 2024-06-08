@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "rand.h"
 
 int syscall_counts[NUM_SYSCALLS] = {0};   // Initialize all elements to 0
 
@@ -126,6 +127,9 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  
+  p->tickets = 1; // Default number of tickets for lottery scheduling
+  p->ticks = 0;   // Initialize number of ticks to 0
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -446,32 +450,52 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
-  struct cpu *c = mycpu();
-  
-  c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
+    struct proc *p;
+    struct cpu *c = mycpu();
+    c->proc = 0;
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+    for(;;){
+        // Avoid deadlock by ensuring that devices can interrupt.
+        intr_on();
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
-      release(&p->lock);
+        int total_tickets = 0;
+
+        // Calculate the total number of tickets
+        for(p = proc; p < &proc[NPROC]; p++) {
+            acquire(&p->lock);
+            if(p->state == RUNNABLE) {
+                total_tickets += p->tickets;
+            }
+            release(&p->lock);
+        }
+
+        if(total_tickets > 0) {
+            int winning_ticket = random() % total_tickets;
+            int current_ticket = 0;
+
+            // Find the process with the winning ticket
+            for(p = proc; p < &proc[NPROC]; p++) {
+                acquire(&p->lock);
+                if(p->state == RUNNABLE) {
+                    current_ticket += p->tickets;
+                    if(current_ticket > winning_ticket) {
+                        // Switch to chosen process
+                        p->state = RUNNING;
+                        c->proc = p;
+                        swtch(&c->context, &p->context);
+                        // Process is done running for now.
+                        // It should have changed its p->state before coming back.
+                        c->proc = 0;
+                        release(&p->lock);
+                        break;
+                    }
+                }
+                release(&p->lock);
+            }
+        }
     }
-  }
 }
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores

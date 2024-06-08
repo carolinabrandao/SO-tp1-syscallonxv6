@@ -5,8 +5,14 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "pstat.h"
 
 extern int syscall_counts[NUM_SYSCALLS]; 
+
+extern struct {
+    struct spinlock lock;
+    struct proc proc[NPROC];
+} ptable;
 
 uint64
 sys_exit(void)
@@ -102,4 +108,39 @@ sys_getcnt(void)
     return -1;
   }
   return syscall_counts[syscall_number];
+}
+
+uint64
+sys_settickets(void)
+{
+    int n;
+    argint(0, &n);
+    if(n < 1)
+      return -1;
+    myproc()->tickets = n;
+    return 0;
+}
+
+uint64
+sys_getpinfo(void)
+{
+    struct pstat *pstat;
+    argint(0, (int*)(&pstat));
+    if (pstat < 0)
+        return -1;
+
+    struct proc *p;
+    int i = 0;
+
+    acquire(&ptable.lock);
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        pstat->inuse[i] = (p->state != UNUSED && p->state != ZOMBIE);
+        pstat->pid[i] = p->pid;
+        pstat->tickets[i] = p->tickets;
+        pstat->ticks[i] = p->ticks;
+        i++;
+    }
+    release(&ptable.lock);
+
+    return 0;
 }
