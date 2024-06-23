@@ -189,3 +189,6 @@ void            virtio_disk_intr(void);
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 uint64 sys_getcnt(void);
+
+extern struct spinlock tickets_lock;
+extern int total_tickets;

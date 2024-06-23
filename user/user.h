@@ -1,5 +1,6 @@
 struct stat;
-struct pstat;
+#include "../kernel/pstat.h"
+#include "../kernel/param.h"
 #include "../kernel/types.h"
 
 

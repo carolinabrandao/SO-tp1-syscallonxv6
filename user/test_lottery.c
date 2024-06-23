@@ -1,7 +1,4 @@
-#include "types.h"
-#include "stat.h"
 #include "user.h"
-#include "pstat.h"
 
 void spin() {
     int i = 0;

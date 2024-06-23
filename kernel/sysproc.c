@@ -9,6 +9,11 @@
 
 extern int syscall_counts[NUM_SYSCALLS]; 
 
+extern struct proc proc[NPROC];
+
+extern int total_tickets;
+extern struct spinlock tickets_lock;
+
 extern struct {
     struct spinlock lock;
     struct proc proc[NPROC];
@@ -110,37 +115,101 @@ sys_getcnt(void)
   return syscall_counts[syscall_number];
 }
 
+// uint64
+// sys_settickets(void)
+// {
+//     int n;
+//     argint(0, &n);
+//     if(n < 1)
+//       return -1;
+//     myproc()->tickets = n;
+//     return 0;
+// }
+
 uint64
 sys_settickets(void)
 {
+    printf("sys_settickets\n");
     int n;
+    struct proc *p = myproc(); // Obtém o processo atual
     argint(0, &n);
     if(n < 1)
       return -1;
-    myproc()->tickets = n;
+
+    acquire(&p->lock);
+    p->tickets = n;
+    release(&p->lock);
+
+    acquire(&tickets_lock);
+    total_tickets += n;
+    release(&tickets_lock);
+
     return 0;
 }
+
+// uint64
+// sys_getpinfo(void)
+// {
+//     struct pstat *pstat;
+//     argint(0, (int*)(&pstat));
+//     if (pstat < 0)
+//         return -1;
+
+//     struct proc *p;
+//     int i = 0;
+
+//     acquire(&ptable.lock);
+//     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+//         pstat->inuse[i] = (p->state != UNUSED && p->state != ZOMBIE);
+//         pstat->pid[i] = p->pid;
+//         pstat->tickets[i] = p->tickets;
+//         pstat->ticks[i] = p->ticks;
+//         i++;
+//     }
+//     release(&ptable.lock);
+
+//     return 0;
+// }
+
 
 uint64
 sys_getpinfo(void)
 {
-    struct pstat *pstat;
-    argint(0, (int*)(&pstat));
-    if (pstat < 0)
+    struct pstat pstat;
+    struct pstat *upstat;
+
+    // Obtenha o ponteiro do espaço do usuário
+    argaddr(0, (uint64*)&upstat);
+
+    if (upstat < 0)
+        return -1;
+
+    if (upstat == 0)
         return -1;
 
     struct proc *p;
     int i = 0;
 
-    acquire(&ptable.lock);
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-        pstat->inuse[i] = (p->state != UNUSED && p->state != ZOMBIE);
-        pstat->pid[i] = p->pid;
-        pstat->tickets[i] = p->tickets;
-        pstat->ticks[i] = p->ticks;
+    for (p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if (p->state != UNUSED) {
+            pstat.inuse[i] = 1;
+            pstat.pid[i] = p->pid;
+            pstat.tickets[i] = p->tickets;
+            pstat.ticks[i] = p->ticks;
+        } else {
+            pstat.inuse[i] = 0;
+            pstat.pid[i] = 0;
+            pstat.tickets[i] = 0;
+            pstat.ticks[i] = 0;
+        }
+        release(&p->lock);
         i++;
     }
-    release(&ptable.lock);
+
+    // Copie a estrutura preenchida para o espaço do usuário
+    if (copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat)) < 0)
+        return -1;
 
     return 0;
 }

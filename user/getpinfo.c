@@ -1,10 +1,7 @@
-#include "types.h"
-#include "stat.h"
 #include "user.h"
-#include "pstat.h"
 
-int main() {
-    struct pstat pinfo;
+int main(int argc, char *argv[]) {
+   struct pstat pinfo;
     if (getpinfo(&pinfo) < 0) {
         printf("Error: getpinfo failed\n");
         exit(1);

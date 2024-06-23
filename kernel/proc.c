@@ -29,6 +29,11 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+// lottery scheduling variables
+struct spinlock tickets_lock;
+int total_tickets = 0;
+
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -318,6 +323,16 @@ fork(void)
 
   pid = np->pid;
 
+  printf("Fork Updating tickets\n");
+  np->tickets = p->tickets;  // Inherit number of tickets from parent
+  printf("Fork Updating tickets done %d\n", np->tickets);
+  // Update total tickets
+  acquire(&tickets_lock);
+  total_tickets += np->tickets;
+  release(&tickets_lock);
+
+  printf("Fork total_tickets: %d\n", total_tickets);
+
   release(&np->lock);
 
   acquire(&wait_lock);
@@ -356,6 +371,11 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // Update total tickets
+  acquire(&tickets_lock);
+  total_tickets -= p->tickets;
+  release(&tickets_lock);
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -453,45 +473,41 @@ scheduler(void)
     struct proc *p;
     struct cpu *c = mycpu();
     c->proc = 0;
-
+    printf("Scheduler total_tickets: %d\n", total_tickets);
     for(;;){
         // Avoid deadlock by ensuring that devices can interrupt.
         intr_on();
 
-        int total_tickets = 0;
+        acquire(&tickets_lock);
+        
+        if(total_tickets == 0) {
+            total_tickets = 1; // Reset total tickets to 1
+            release(&tickets_lock);
+            continue;
+        }
 
-        // Calculate the total number of tickets
+        int winning_ticket = random() % total_tickets;
+        int current_ticket = 0;
+        release(&tickets_lock);
+
+        // Find the process with the winning ticket
         for(p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if(p->state == RUNNABLE) {
-                total_tickets += p->tickets;
+                current_ticket += p->tickets;
+                if(current_ticket > winning_ticket) {
+                    // Switch to chosen process
+                    p->state = RUNNING;
+                    c->proc = p;
+                    swtch(&c->context, &p->context);
+                    // Process is done running for now.
+                    // It should have changed its p->state before coming back.
+                    c->proc = 0;
+                    release(&p->lock);
+                    break;
+                }
             }
             release(&p->lock);
-        }
-
-        if(total_tickets > 0) {
-            int winning_ticket = random() % total_tickets;
-            int current_ticket = 0;
-
-            // Find the process with the winning ticket
-            for(p = proc; p < &proc[NPROC]; p++) {
-                acquire(&p->lock);
-                if(p->state == RUNNABLE) {
-                    current_ticket += p->tickets;
-                    if(current_ticket > winning_ticket) {
-                        // Switch to chosen process
-                        p->state = RUNNING;
-                        c->proc = p;
-                        swtch(&c->context, &p->context);
-                        // Process is done running for now.
-                        // It should have changed its p->state before coming back.
-                        c->proc = 0;
-                        release(&p->lock);
-                        break;
-                    }
-                }
-                release(&p->lock);
-            }
         }
     }
 }
@@ -582,6 +598,11 @@ sleep(void *chan, struct spinlock *lk)
   // Tidy up.
   p->chan = 0;
 
+  // remove ticket from total_tickets
+  acquire(&tickets_lock);
+  total_tickets -= p->tickets;
+  release(&tickets_lock);
+
   // Reacquire original lock.
   release(&p->lock);
   acquire(lk);
@@ -599,6 +620,10 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        // recover ticket
+        acquire(&tickets_lock);
+        total_tickets += p->tickets;
+        release(&tickets_lock);
       }
       release(&p->lock);
     }
