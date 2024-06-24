@@ -83,7 +83,7 @@ exec(char *path, char **argv)
   total_tickets += p->tickets;   // Add new tickets
   release(&tickets_lock);
 
-  printf("Exec updating tickets done %d\n", p->tickets);
+  printf("Exec updating tickets done %d\n", total_tickets);
 
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible as a stack guard.

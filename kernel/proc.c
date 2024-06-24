@@ -136,6 +136,8 @@ found:
   p->tickets = 1; // Default number of tickets for lottery scheduling
   p->ticks = 0;   // Initialize number of ticks to 0
 
+  total_tickets += p->tickets; // Add the number of tickets to the total
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -372,11 +374,6 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
-  // Update total tickets
-  acquire(&tickets_lock);
-  total_tickets -= p->tickets;
-  release(&tickets_lock);
-
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
@@ -400,6 +397,11 @@ exit(int status)
   wakeup(p->parent);
   
   acquire(&p->lock);
+
+  // Update total tickets
+  acquire(&tickets_lock);
+  total_tickets -= p->tickets;
+  release(&tickets_lock);
 
   p->xstate = status;
   p->state = ZOMBIE;
@@ -481,34 +483,34 @@ scheduler(void)
         acquire(&tickets_lock);
         
         if(total_tickets == 0) {
-            total_tickets = 1; // Reset total tickets to 1
             release(&tickets_lock);
             continue;
         }
 
-        int winning_ticket = random() % total_tickets;
-        int current_ticket = 0;
-        release(&tickets_lock);
+          int winning_ticket = random() % total_tickets;
+          int current_ticket = 0;
+          release(&tickets_lock);
 
-        // Find the process with the winning ticket
-        for(p = proc; p < &proc[NPROC]; p++) {
-            acquire(&p->lock);
-            if(p->state == RUNNABLE) {
-                current_ticket += p->tickets;
-                if(current_ticket > winning_ticket) {
-                    // Switch to chosen process
-                    p->state = RUNNING;
-                    c->proc = p;
-                    swtch(&c->context, &p->context);
-                    // Process is done running for now.
-                    // It should have changed its p->state before coming back.
-                    c->proc = 0;
-                    release(&p->lock);
-                    break;
-                }
-            }
-            release(&p->lock);
-        }
+          // Find the process with the winning ticket
+          for(p = proc; p < &proc[NPROC]; p++) {
+              acquire(&p->lock);
+              if(p->state == RUNNABLE) {
+                  current_ticket += p->tickets;
+                  if(current_ticket > winning_ticket) {
+                      // Switch to chosen process
+                      p->state = RUNNING;
+                      p->ticks++;
+                      c->proc = p;
+                      swtch(&c->context, &p->context);
+                      // Process is done running for now.
+                      // It should have changed its p->state before coming back.
+                      c->proc = 0;
+                      release(&p->lock);
+                      break;
+                  }
+              }
+              release(&p->lock);
+          }
     }
 }
 
@@ -589,6 +591,11 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
 
+  // remove ticket from total_tickets
+  acquire(&tickets_lock);
+  total_tickets -= p->tickets;
+  release(&tickets_lock);
+
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
@@ -597,11 +604,6 @@ sleep(void *chan, struct spinlock *lk)
 
   // Tidy up.
   p->chan = 0;
-
-  // remove ticket from total_tickets
-  acquire(&tickets_lock);
-  total_tickets -= p->tickets;
-  release(&tickets_lock);
 
   // Reacquire original lock.
   release(&p->lock);
