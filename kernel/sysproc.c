@@ -19,6 +19,11 @@ extern struct {
     struct proc proc[NPROC];
 } ptable;
 
+int settickets(int pid, int n);
+int getpinfo(struct pstat *ps);
+
+
+
 uint64
 sys_exit(void)
 {
@@ -126,25 +131,34 @@ sys_getcnt(void)
 //     return 0;
 // }
 
+// uint64
+// sys_settickets(void)
+// {
+//     printf("sys_settickets\n");
+//     int n;
+//     struct proc *p = myproc(); // Obtém o processo atual
+//     argint(0, &n);
+//     if(n < 1)
+//       return -1;
+
+//     acquire(&p->lock);
+//     p->tickets = n;
+//     release(&p->lock);
+
+//     acquire(&tickets_lock);
+//     total_tickets += n;
+//     release(&tickets_lock);
+
+//     return 0;
+// }
+
 uint64
 sys_settickets(void)
 {
-    printf("sys_settickets\n");
-    int n;
-    struct proc *p = myproc(); // Obtém o processo atual
-    argint(0, &n);
-    if(n < 1)
-      return -1;
-
-    acquire(&p->lock);
-    p->tickets = n;
-    release(&p->lock);
-
-    acquire(&tickets_lock);
-    total_tickets += n;
-    release(&tickets_lock);
-
-    return 0;
+  int pid, n;
+  argint(0, &pid);
+    return -1;
+  return settickets(pid, n);
 }
 
 // uint64
@@ -172,44 +186,53 @@ sys_settickets(void)
 // }
 
 
+// uint64
+// sys_getpinfo(void)
+// {
+//     struct pstat pstat;
+//     struct pstat *upstat;
+
+//     // Obtenha o ponteiro do espaço do usuário
+//     argaddr(0, (uint64*)&upstat);
+
+//     if (upstat < 0)
+//         return -1;
+
+//     if (upstat == 0)
+//         return -1;
+
+//     struct proc *p;
+//     int i = 0;
+
+//     for (p = proc; p < &proc[NPROC]; p++) {
+//         acquire(&p->lock);
+//         if (p->state != UNUSED) {
+//             pstat.inuse[i] = 1;
+//             pstat.pid[i] = p->pid;
+//             pstat.tickets[i] = p->tickets;
+//             pstat.ticks[i] = p->ticks;
+//         } else {
+//             pstat.inuse[i] = 0;
+//             pstat.pid[i] = 0;
+//             pstat.tickets[i] = 0;
+//             pstat.ticks[i] = 0;
+//         }
+//         release(&p->lock);
+//         i++;
+//     }
+
+//     // Copie a estrutura preenchida para o espaço do usuário
+//     if (copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat)) < 0)
+//         return -1;
+
+//     return 0;
+// }
+
 uint64
 sys_getpinfo(void)
 {
-    struct pstat pstat;
-    struct pstat *upstat;
-
-    // Obtenha o ponteiro do espaço do usuário
-    argaddr(0, (uint64*)&upstat);
-
-    if (upstat < 0)
-        return -1;
-
-    if (upstat == 0)
-        return -1;
-
-    struct proc *p;
-    int i = 0;
-
-    for (p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        if (p->state != UNUSED) {
-            pstat.inuse[i] = 1;
-            pstat.pid[i] = p->pid;
-            pstat.tickets[i] = p->tickets;
-            pstat.ticks[i] = p->ticks;
-        } else {
-            pstat.inuse[i] = 0;
-            pstat.pid[i] = 0;
-            pstat.tickets[i] = 0;
-            pstat.ticks[i] = 0;
-        }
-        release(&p->lock);
-        i++;
-    }
-
-    // Copie a estrutura preenchida para o espaço do usuário
-    if (copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat)) < 0)
-        return -1;
-
-    return 0;
+  struct pstat *ps;
+  if(argstr(0, (void*)&ps, sizeof(*ps)) < 0)
+    return -1;
+  return getpinfo(ps);
 }

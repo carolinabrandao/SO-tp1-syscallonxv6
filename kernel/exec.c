@@ -9,6 +9,8 @@
 
 static int loadseg(pde_t *, uint64, struct inode *, uint, uint);
 
+#define DEFAULT_TICKETS 10
+
 int flags2perm(int flags)
 {
     int perm = 0;
@@ -74,6 +76,8 @@ exec(char *path, char **argv)
 
   p = myproc();
   uint64 oldsz = p->sz;
+
+  myproc()->tickets = DEFAULT_TICKETS;
 
   // Update tickets handling
   printf("Exec updating tickets\n");

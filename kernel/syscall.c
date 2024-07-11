@@ -155,3 +155,16 @@ syscall(void)
   }
 }
 
+int
+argptr(int n, void *pp, int size)
+{
+  int addr;
+  argint(n, &addr);
+    return -1;
+  if(size < 0)
+    return -1;
+  if((addr < 0) || (addr + size > myproc()->sz))
+    return -1;
+  *(uint64*)pp = addr;
+  return 0;
+}

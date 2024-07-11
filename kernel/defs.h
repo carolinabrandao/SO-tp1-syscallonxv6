@@ -109,6 +109,8 @@ void            procdump(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
+void switchuvm(struct proc *);
+void switchkvm(void);
 
 // spinlock.c
 void            acquire(struct spinlock*);

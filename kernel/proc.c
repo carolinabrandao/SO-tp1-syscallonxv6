@@ -15,8 +15,17 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
+struct pstat {
+  int inuse[NPROC];
+  int tickets[NPROC];
+  int pid[NPROC];
+  int ticks[NPROC];
+};
+
 int nextpid = 1;
 struct spinlock pid_lock;
+
+struct spinlock tickets_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -33,6 +42,11 @@ struct spinlock wait_lock;
 struct spinlock tickets_lock;
 int total_tickets = 0;
 
+void
+pinit(void)
+{
+  initlock(&tickets_lock, "tickets_lock");
+}
 
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
@@ -472,48 +486,105 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-    struct proc *p;
-    struct cpu *c = mycpu();
-    c->proc = 0;
-    printf("Scheduler total_tickets: %d\n", total_tickets);
-    for(;;){
-        // Avoid deadlock by ensuring that devices can interrupt.
-        intr_on();
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
 
-        acquire(&tickets_lock);
-        
-        if(total_tickets == 0) {
-            release(&tickets_lock);
-            continue;
-        }
+  for(;;){
+    // Enable interrupts on this processor.
+    intr_on();
 
-          int winning_ticket = random() % total_tickets;
-          int current_ticket = 0;
-          release(&tickets_lock);
-
-          // Find the process with the winning ticket
-          for(p = proc; p < &proc[NPROC]; p++) {
-              acquire(&p->lock);
-              if(p->state == RUNNABLE) {
-                  current_ticket += p->tickets;
-                  if(current_ticket > winning_ticket) {
-                      // Switch to chosen process
-                      p->state = RUNNING;
-                      p->ticks++;
-                      c->proc = p;
-                      swtch(&c->context, &p->context);
-                      // Process is done running for now.
-                      // It should have changed its p->state before coming back.
-                      c->proc = 0;
-                      release(&p->lock);
-                      break;
-                  }
-              }
-              release(&p->lock);
-          }
+    // Total number of tickets
+    int total_tickets = 0;
+    for(p = proc; p < &proc[NPROC]; p++){
+      if(p->state == RUNNABLE)
+        total_tickets += p->tickets;
     }
+
+    if(total_tickets > 0){
+      // Generate a random number between 1 and total_tickets
+      int winning_ticket = random() % total_tickets + 1;
+
+      int current_ticket = 0;
+      for(p = proc; p < &proc[NPROC]; p++){
+        if(p->state == RUNNABLE){
+          current_ticket += p->tickets;
+          if(current_ticket >= winning_ticket){
+            // Switch to chosen process
+            c->proc = p;
+            switchuvm(p);
+            p->state = RUNNING;
+            swtch(c->scheduler, &(p->context));
+            switchkvm();
+            c->proc = 0;
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
+// scheduler(void)
+// {
+//     struct proc *p;
+//     struct cpu *c = mycpu();
+//     c->proc = 0;
+//     printf("Scheduler total_tickets: %d\n", total_tickets);
+//     for(;;){
+//         // Avoid deadlock by ensuring that devices can interrupt.
+//         intr_on();
+
+//         acquire(&tickets_lock);
+        
+//         if(total_tickets == 0) {
+//             release(&tickets_lock);
+//             continue;
+//         }
+
+//           int winning_ticket = random() % total_tickets;
+//           int current_ticket = 0;
+//           release(&tickets_lock);
+
+//           // Find the process with the winning ticket
+//           for(p = proc; p < &proc[NPROC]; p++) {
+//               acquire(&p->lock);
+//               if(p->state == RUNNABLE) {
+//                   current_ticket += p->tickets;
+//                   if(current_ticket > winning_ticket) {
+//                       // Switch to chosen process
+//                       p->state = RUNNING;
+//                       p->ticks++;
+//                       c->proc = p;
+//                       swtch(&c->context, &p->context);
+//                       // Process is done running for now.
+//                       // It should have changed its p->state before coming back.
+//                       c->proc = 0;
+//                       release(&p->lock);
+//                       break;
+//                   }
+//               }
+//               release(&p->lock);
+//           }
+//     }
+// }
+
+int
+settickets(int pid, int n)
+{
+  struct proc *p;
+
+ 
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->pid == pid){
+      acquire(&p->lock);
+      p->tickets = n;
+      release(&p->lock);
+      return 0;
+    }
+  }
+  return -1;
+}
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -733,4 +804,23 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int
+getpinfo(struct pstat *ps)
+{
+  struct proc *p;
+  int i = 0;
+  
+
+  for(p = proc; p < &proc[NPROC]; p++, i++){
+    acquire(&p->lock);
+    ps->inuse[i] = (p->state != UNUSED);
+    ps->tickets[i] = p->tickets;
+    ps->pid[i] = p->pid;
+    ps->ticks[i] = p->ticks;
+    release(&p->lock);
+  }
+  
+  return 0;
 }
