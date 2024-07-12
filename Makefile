@@ -12,7 +12,6 @@ OBJS = \
   $K/string.o \
   $K/main.o \
   $K/vm.o \
-  $K/rand.o \
   $K/proc.o \
   $K/swtch.o \
   $K/trampoline.o \
@@ -29,7 +28,9 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/virtio_disk.o \
+  $K/rand.o \
+
 
 # riscv64-unknown-elf- or riscv64-linux-gnu-
 # perhaps in /opt/riscv/bin
@@ -90,16 +91,10 @@ tags: $(OBJS) _init
 
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
-# Regras para compilar os programas de teste
 $U/_test_lottery: $U/test_lottery.o $(ULIB)
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_test_lottery $U/test_lottery.o $(ULIB)
 	$(OBJDUMP) -S $U/_test_lottery > $U/test_lottery.asm
 	$(OBJDUMP) -t $U/_test_lottery | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/test_lottery.sym
-
-$U/_test_getpinfo: $U/test_getpinfo.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $U/user.ld -o $U/_test_getpinfo $U/test_getpinfo.o $(ULIB)
-	$(OBJDUMP) -S $U/_test_getpinfo > $U/test_getpinfo.asm
-	$(OBJDUMP) -t $U/_test_getpinfo | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/test_getpinfo.sym
 
 _%: %.o $(ULIB)
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $^
@@ -144,11 +139,7 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
-	$U/_getcnt\
-	$U/_settickets\
-	$U/_getpinfo\
 	$U/_test_lottery\
-   	$U/_test_getpinfo
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

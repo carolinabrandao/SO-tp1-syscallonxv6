@@ -7,17 +7,7 @@
 #include "proc.h"
 #include "pstat.h"
 
-extern int syscall_counts[NUM_SYSCALLS]; 
-
 extern struct proc proc[NPROC];
-
-extern int total_tickets;
-extern struct spinlock tickets_lock;
-
-extern struct {
-    struct spinlock lock;
-    struct proc proc[NPROC];
-} ptable;
 
 uint64
 sys_exit(void)
@@ -105,72 +95,20 @@ sys_uptime(void)
 
 
 uint64
-sys_getcnt(void)
-{
-  int syscall_number;
-  argint(0, &syscall_number);
-  if (syscall_number < 1 || syscall_number >= NUM_SYSCALLS){
-    return -1;
-  }
-  return syscall_counts[syscall_number];
-}
-
-// uint64
-// sys_settickets(void)
-// {
-//     int n;
-//     argint(0, &n);
-//     if(n < 1)
-//       return -1;
-//     myproc()->tickets = n;
-//     return 0;
-// }
-
-uint64
 sys_settickets(void)
 {
-    printf("sys_settickets\n");
-    int n;
-    struct proc *p = myproc(); // Obtém o processo atual
-    argint(0, &n);
-    if(n < 1)
-      return -1;
+  int num;
+  argint(0, &num);
+  
+  // Caso passe um número de syscall menor do que 1 (1 é a primeira)
+  if(num < 1)
+    return -1;
 
-    acquire(&p->lock);
-    p->tickets = n;
-    release(&p->lock);
+  struct proc *currproc = myproc();
+  currproc->tickets = num;
+  return 0;
 
-    acquire(&tickets_lock);
-    total_tickets += n;
-    release(&tickets_lock);
-
-    return 0;
 }
-
-// uint64
-// sys_getpinfo(void)
-// {
-//     struct pstat *pstat;
-//     argint(0, (int*)(&pstat));
-//     if (pstat < 0)
-//         return -1;
-
-//     struct proc *p;
-//     int i = 0;
-
-//     acquire(&ptable.lock);
-//     for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-//         pstat->inuse[i] = (p->state != UNUSED && p->state != ZOMBIE);
-//         pstat->pid[i] = p->pid;
-//         pstat->tickets[i] = p->tickets;
-//         pstat->ticks[i] = p->ticks;
-//         i++;
-//     }
-//     release(&ptable.lock);
-
-//     return 0;
-// }
-
 
 uint64
 sys_getpinfo(void)
@@ -208,8 +146,7 @@ sys_getpinfo(void)
     }
 
     // Copie a estrutura preenchida para o espaço do usuário
-    if (copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat)) < 0)
-        return -1;
+    copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat));
 
     return 0;
 }

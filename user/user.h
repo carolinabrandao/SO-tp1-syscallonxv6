@@ -1,4 +1,5 @@
 struct stat;
+
 #include "../kernel/pstat.h"
 #include "../kernel/param.h"
 #include "../kernel/types.h"
@@ -43,6 +44,5 @@ void free(void*);
 int atoi(const char*);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
-int getcnt(int syscall_num);
 int settickets(int number);
 int getpinfo(struct pstat*);

@@ -75,16 +75,6 @@ exec(char *path, char **argv)
   p = myproc();
   uint64 oldsz = p->sz;
 
-  // Update tickets handling
-  printf("Exec updating tickets\n");
-  acquire(&tickets_lock);
-  total_tickets -= p->tickets;  // Remove old tickets
-  p->tickets = 1;                // Reset to default tickets
-  total_tickets += p->tickets;   // Add new tickets
-  release(&tickets_lock);
-
-  printf("Exec updating tickets done %d\n", total_tickets);
-
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible as a stack guard.
   // Use the second as the user stack.
