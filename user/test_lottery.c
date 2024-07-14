@@ -1,11 +1,5 @@
 #include "user.h"
 
-void spin() {
-    int i = 0;
-    while (i < 10000000) { // Busy-wait loop to consume CPU time
-        i++;
-    }
-}
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
@@ -13,62 +7,73 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int tickets1 = atoi(argv[1]);
-    int tickets2 = atoi(argv[2]);
-    int tickets3 = atoi(argv[3]);
+    // Conversão dos argumentos para inteiros
+    int tickets_a = atoi(argv[1]);
+    int tickets_b = atoi(argv[2]);
+    int tickets_c = atoi(argv[3]);
 
-    int pid1 = fork();
-    if (pid1 == 0) {
-        printf("pid1\n");
-        settickets(tickets1);
+    // Criação do primeiro processo filho
+    int process_a = fork();
+    if (process_a == 0) {
+        settickets(tickets_a);
         while (1) {
-            spin();
+            int counter = 0;
+            while (counter < 10000000) {
+                counter++;
+            }
         }
     }
 
-    int pid2 = fork();
-    if (pid2 == 0) {
-        printf("pid2\n");
-        settickets(tickets2);
+    // Criação do segundo processo filho
+    int process_b = fork();
+    if (process_b == 0) {
+        settickets(tickets_b);
         while (1) {
-            spin();
+            int counter = 0;
+            while (counter < 10000000) {
+                counter++;
+            }
         }
     }
 
-    int pid3 = fork();
-    if (pid3 == 0) {
-        printf("pid3\n");
-        settickets(tickets3);
+    // Criação do terceiro processo filho
+    int process_c = fork();
+    if (process_c == 0) {
+        settickets(tickets_c);
         while (1) {
-            spin();
+            int counter = 0;
+            while (counter < 10000000) {
+                counter++;
+            }
         }
     }
 
-
-    struct pstat pinfo;
+    struct pstat proc_info;
     printf("step,pid,tickets,ticks\n");
-    for(int t = 0; t<100; t++){
-        printf("t=%d\n", t);
+
+    // Coleta e impressão de informações dos processos em execução
+    for (int step = 0; step < 100; step++) {
         sleep(10);
 
-        if (getpinfo(&pinfo) < 0) {
+        if (getpinfo(&proc_info) < 0) {
             printf("Error: getpinfo failed\n");
             exit(1);
         }
+
+        // Impressão de dados dos processos filhos específicos
         for (int i = 0; i < NPROC; i++) {
-            if (pinfo.inuse[i] && pinfo.tickets[i] > 1) {
-                printf("%d,%d,%d,%d\n", t, pinfo.pid[i], pinfo.tickets[i], pinfo.ticks[i]);
+            if (proc_info.inuse[i] && proc_info.tickets[i] > 1) {
+                printf("%d,%d,%d,%d\n", step, proc_info.pid[i], proc_info.tickets[i], proc_info.ticks[i]);
             }
         }
-        printf("fim\n");
     }
 
-    // Kill child processes
-    kill(pid1);
-    kill(pid2);
-    kill(pid3);
-    
-    // Wait for children to exit
+    // Encerramento dos processos filhos
+    kill(process_a);
+    kill(process_b);
+    kill(process_c);
+
+    // Espera pelos processos filhos para terminar
     wait(0);
     wait(0);
     wait(0);

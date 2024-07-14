@@ -5,7 +5,6 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "pstat.h"
 #include "rand.h"
 
 struct cpu cpus[NCPU];
@@ -325,7 +324,7 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
 
-   // TP2
+  // Para o processo filho, o número de tickets é igual ao número de tickets do pai
   acquire(&p->lock);
   np->tickets = p->tickets;
   release(&p->lock);
@@ -491,7 +490,6 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    // Have to know the number of tickets to generate the random number
     int total_tickets = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
@@ -501,9 +499,8 @@ scheduler(void)
       release(&p->lock);
     }
 
-    // Generate random number between 0 and total_tickets
     if(total_tickets > 0) {
-      int winning_ticket = random() % total_tickets;
+      int lucky_ticket = random() % total_tickets;
       int count = 0;
 
       for(p = proc; p < &proc[NPROC]; p++) {
@@ -511,7 +508,7 @@ scheduler(void)
         if(p->state == RUNNABLE){
           count += p->tickets;
 
-          if(count > winning_ticket){
+          if(count > lucky_ticket){
             p->state = RUNNING;
             p->ticks += 1;
             c->proc = p;
@@ -520,7 +517,6 @@ scheduler(void)
             release(&p->lock);
             break;
           }
-
         }
 
         release(&p->lock);

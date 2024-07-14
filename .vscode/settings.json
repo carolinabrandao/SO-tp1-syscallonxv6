@@ -9,6 +9,8 @@
         "user.h": "c",
         "param.h": "c",
         "memlayout.h": "c",
-        "spinlock.h": "c"
+        "spinlock.h": "c",
+        "__config": "c",
+        "fcntl.h": "c"
     }
 }

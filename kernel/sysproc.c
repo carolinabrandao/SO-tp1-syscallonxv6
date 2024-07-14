@@ -100,7 +100,6 @@ sys_settickets(void)
   int num;
   argint(0, &num);
   
-  // Caso passe um número de syscall menor do que 1 (1 é a primeira)
   if(num < 1)
     return -1;
 
@@ -114,13 +113,11 @@ uint64
 sys_getpinfo(void)
 {
     struct pstat pstat;
+    memset(&pstat, 0, sizeof(pstat));
+
     struct pstat *upstat;
 
-    // Obtenha o ponteiro do espaço do usuário
     argaddr(0, (uint64*)&upstat);
-
-    if (upstat < 0)
-        return -1;
 
     if (upstat == 0)
         return -1;
@@ -144,8 +141,7 @@ sys_getpinfo(void)
         release(&p->lock);
         i++;
     }
-
-    // Copie a estrutura preenchida para o espaço do usuário
+    
     copyout(myproc()->pagetable, (uint64)upstat, (char*)&pstat, sizeof(pstat));
 
     return 0;
